@@ -1,0 +1,1 @@
+FROM fuzeto/fluentd-logger-php:0.0.1

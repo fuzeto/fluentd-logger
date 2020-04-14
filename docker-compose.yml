@@ -1,0 +1,112 @@
+version: '3'
+services:
+    # Data Outputs
+    elasticsearch:
+        container_name: elasticsearch
+        build: ./data_outputs//elasticsearch
+        volumes:
+            - ./data_outputs//elasticsearch:/usr/share/elasticsearch/data
+        restart: always
+        environment:
+            - xpack.security.enabled=false
+            - discovery.type=single-node
+        ulimits:
+            memlock:
+                soft: -1
+                hard: -1
+            nofile:
+                soft: 262144
+                hard: 262144
+        ports:
+            - "9200:9200"
+            - "9300:9300"
+        expose:
+            - 9200
+        networks:
+            - traefik-net
+    
+    kibana:
+        container_name: kibana
+        build: ./data_outputs/kibana 
+        volumes:
+            - ./data_outputs/kibana/conf/kibana.yml:/usr/share/kibana/config/kibana.yml
+        restart: always
+        depends_on:
+            - elasticsearch
+        links:
+            - elasticsearch
+        ports:
+            - "5601:5601"
+        expose:
+            - 5601
+        environment:
+            CLUSTER_NAME: elasticsearch
+            ELASTICSEARCH_HOSTS: http://elasticsearch:9200
+        networks:
+            - traefik-net
+    
+    fluentd:
+        container_name: fluentd
+        build: ./fluentd
+        volumes:
+            - ./fluentd/conf:/fluentd/etc
+        links:
+            - elasticsearch
+        depends_on:
+            - elasticsearch
+        restart: always
+        expose:
+            - 24224
+        ports:
+            - "24224:24224"
+            - "24224:24224/udp"
+        networks:
+            - traefik-net
+
+    # Data Sources
+    java:
+        build: ./data_sources/java
+        container_name: java
+        restart: always
+        depends_on:
+            - fluentd
+            - elasticsearch
+        ports: 
+            - "8081:8081"
+        expose:
+            - "8081"
+        networks:
+            - traefik-net
+
+    node:
+        build: ./data_sources/node
+        container_name: node
+        depends_on:
+            - fluentd
+            - elasticsearch
+        ports:
+            - "8082:8082"
+        expose:
+            - "8082"
+        networks:
+            - traefik-net
+
+    php:
+        build: ./data_sources/php
+        container_name: php
+        depends_on:
+            - fluentd
+            - elasticsearch
+        ports:
+            - "8083:80"
+        expose:
+            - "8083"
+        networks:
+            - traefik-net
+
+volumes:
+    elasticsearch-data:
+        driver: local
+
+networks:
+    traefik-net:

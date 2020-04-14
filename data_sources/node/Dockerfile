@@ -1,0 +1,1 @@
+FROM fuzeto/fluentd-logger-node:0.0.1
